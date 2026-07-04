@@ -94,7 +94,7 @@ class Coder:
         percentage: float, 
         max_delta: float, 
         band: str,
-        seed: Optional[int] = 42
+        key: str = "default_key"
     ) -> np.ndarray:
         """
         Modifies the phase of a configurable subset of spectrum coefficients in a specific frequency band.
@@ -104,8 +104,9 @@ class Coder:
         - percentage: Percentage of coefficients in the band to modify (0 to 100).
         - max_delta: Maximum phase shift in radians.
         - band: Frequency band to target ("low", "mid", "high", "all").
-        - seed: Random seed for reproducibility.
+        - key: Key to generate a reproducible seed.
         """
+        seed = cls.key_to_seed(key)
         # Get normalized frequency distances
         distances = cls.get_frequency_distances(spectrum.shape)
         
@@ -149,6 +150,77 @@ class Coder:
         
         # Apply deltas
         flat_phase[selected_flat_indices] += phase_deltas
+        
+        # Reconstruct complex values
+        modified_phase = flat_phase.reshape(spectrum.shape)
+        
+        # Build new complex spectrum
+        modified_spectrum = magnitude * np.exp(1j * modified_phase)
+        return modified_spectrum
+
+    @classmethod
+    def remove_phase_noise(
+        cls, 
+        spectrum: np.ndarray, 
+        percentage: float, 
+        max_delta: float, 
+        band: str,
+        key: str = "default_key"
+    ) -> np.ndarray:
+        """
+        Reverts the phase modification by subtracting the pseudo-random phase deltas from the same indices.
+        
+        Parameters:
+        - spectrum: Complex Fourier spectrum (should be fft_shifted).
+        - percentage: Percentage of coefficients in the band to modify (0 to 100).
+        - max_delta: Maximum phase shift in radians.
+        - band: Frequency band to target ("low", "mid", "high", "all").
+        - key: Key to generate a reproducible seed.
+        """
+        seed = cls.key_to_seed(key)
+        # Get normalized frequency distances
+        distances = cls.get_frequency_distances(spectrum.shape)
+        
+        # Define band masks
+        if band == "low":
+            mask = (distances >= 0.0) & (distances < 0.33)
+        elif band == "mid":
+            mask = (distances >= 0.33) & (distances < 0.66)
+        elif band == "high":
+            mask = (distances >= 0.66) & (distances <= 1.0)
+        elif band == "all":
+            mask = np.ones(spectrum.shape, dtype=bool)
+        else:
+            raise ValueError(f"Unknown frequency band: {band}")
+            
+        # Get flat indices where mask is True
+        candidate_indices = np.where(mask.flatten())[0]
+        n_candidates = len(candidate_indices)
+        
+        if n_candidates == 0:
+            return spectrum.copy()
+            
+        # Select subset of candidate indices to scramble
+        rng = np.random.default_rng(seed)
+        num_to_modify = int(np.round((percentage / 100.0) * n_candidates))
+        
+        if num_to_modify == 0:
+            return spectrum.copy()
+            
+        selected_flat_indices = rng.choice(candidate_indices, size=num_to_modify, replace=False)
+        
+        # Reconstruct phase
+        magnitude = np.abs(spectrum)
+        phase = np.angle(spectrum)
+        
+        # Flatten for easy index modification
+        flat_phase = phase.flatten()
+        
+        # Draw the exact same phase deltas
+        phase_deltas = rng.uniform(-max_delta, max_delta, size=num_to_modify)
+        
+        # Subtract the deltas to recover the original phase
+        flat_phase[selected_flat_indices] -= phase_deltas
         
         # Reconstruct complex values
         modified_phase = flat_phase.reshape(spectrum.shape)

@@ -35,13 +35,17 @@ def process_audio(input_wav_path: str, mode: str, params: dict) -> dict:
         percentage = params.get("percentage", 10.0)
         max_delta = params.get("max_delta", np.pi)
         band = params.get("band", "all")
+        key = params.get("key", "default_key")
         
         # Apply phase noise on the shifted spectrum
         shifted_spectrum = FourierProcessor.fft_shift(spectrum)
-        modified_shifted = Coder.apply_phase_noise(shifted_spectrum, percentage, max_delta, band)
+        modified_shifted = Coder.apply_phase_noise(shifted_spectrum, percentage, max_delta, band, key)
         
         coded_spectrum = FourierProcessor.ifft_shift(modified_shifted)
-        decoded_spectrum = coded_spectrum.copy()
+        
+        # Decode by removing phase noise on the shifted spectrum
+        decoded_shifted = Coder.remove_phase_noise(modified_shifted, percentage, max_delta, band, key)
+        decoded_spectrum = FourierProcessor.ifft_shift(decoded_shifted)
         
     else:
         coded_spectrum = spectrum.copy()

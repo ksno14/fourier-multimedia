@@ -31,8 +31,9 @@ def test_frequency_distances_1d():
 def test_phase_noise_bands():
     np.random.seed(42)
     spectrum = np.ones(100, dtype=complex)
+    key = "my_secret_key"
     
-    modified = Coder.apply_phase_noise(spectrum, percentage=100.0, max_delta=1.0, band="low", seed=42)
+    modified = Coder.apply_phase_noise(spectrum, percentage=100.0, max_delta=1.0, band="low", key=key)
     
     assert np.allclose(np.abs(spectrum), np.abs(modified), atol=1e-12)
     
@@ -41,3 +42,13 @@ def test_phase_noise_bands():
         d = distances[i]
         if d >= 0.33:
             assert spectrum[i] == modified[i]
+
+def test_phase_noise_lossless():
+    np.random.seed(42)
+    spectrum = np.random.rand(100) + 1j * np.random.rand(100)
+    key = "secure_key_123"
+    
+    modified = Coder.apply_phase_noise(spectrum, percentage=40.0, max_delta=1.5, band="all", key=key)
+    recovered = Coder.remove_phase_noise(modified, percentage=40.0, max_delta=1.5, band="all", key=key)
+    
+    assert np.allclose(spectrum, recovered, atol=1e-12)
