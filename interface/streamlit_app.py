@@ -375,12 +375,12 @@ st.markdown(
 
 # ─── Tab bar ──────────────────────────────────────────────────────────────────
 tab_home, tab_text, tab_audio, tab_image, tab_epicycles, tab_experiments = st.tabs([
-    "🏠 Inicio",
-    "📝 Texto",
-    "🎵 Audio",
-    "🖼️ Imagen",
-    "➰ Epiciclos",
-    "🔬 Experimentos",
+    "Inicio",
+    "Texto",
+    "Audio",
+    "Imagen",
+    "Epiciclos",
+    "Experimentos",
 ])
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -422,9 +422,9 @@ with tab_home:
         st.info("""
         ### Estructura de las señales
 
-        🔤 **Texto** → Vector ASCII 1D\n
-        🎵 **Audio** → Muestras WAV normalizadas\n
-        🖼️ **Imagen** → Matriz de píxeles en escala de grises 2D
+        **Texto** → Vector ASCII 1D\n
+        **Audio** → Muestras WAV normalizadas\n
+        **Imagen** → Matriz de píxeles en escala de grises 2D
         """)
         st.image(
             "https://upload.wikimedia.org/wikipedia/commons/5/50/"
@@ -830,13 +830,6 @@ with tab_epicycles:
 
             frames.append(go.Frame(data=fd, name=str(m)))
 
-        play_btn_style = dict(
-            bgcolor=CLR_CARD,
-            bordercolor=CLR_BORDER,
-            borderwidth=1,
-            font=dict(color=CLR_TEXT, size=13),
-        )
-
         fig_ep = go.Figure(
             data=frames[0].data,
             layout=go.Layout(
@@ -855,13 +848,16 @@ with tab_epicycles:
                 updatemenus=[dict(
                     type="buttons",
                     direction="left",
+                    # Style properties belong on the updatemenu container, not on each button
+                    bgcolor=CLR_CARD,
+                    bordercolor=CLR_BORDER,
+                    borderwidth=1,
+                    font=dict(color=CLR_TEXT, size=13),
                     buttons=[
                         dict(label="▶  Play", method="animate",
-                             args=[None, dict(frame=dict(duration=50, redraw=False), fromcurrent=True)],
-                             **play_btn_style),
+                             args=[None, dict(frame=dict(duration=50, redraw=False), fromcurrent=True)]),
                         dict(label="⏸  Pausa", method="animate",
-                             args=[[], dict(frame=dict(duration=0, redraw=False), mode="immediate")],
-                             **play_btn_style),
+                             args=[[], dict(frame=dict(duration=0, redraw=False), mode="immediate")]),
                     ],
                     pad=dict(r=10, t=10), showactive=True,
                     x=0.1, xanchor="right", y=0.0, yanchor="top",
