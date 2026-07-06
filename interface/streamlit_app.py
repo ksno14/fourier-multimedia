@@ -82,6 +82,64 @@ def light_fig(fig: go.Figure, title: str = "", height: int = 400) -> go.Figure:
     return fig
 
 
+def _sample_open_polyline(points: np.ndarray, samples_per_segment: int) -> np.ndarray:
+    """Sample an open polyline with evenly spaced points on each segment."""
+    if len(points) < 2:
+        return points.astype(np.float64)
+
+    samples_per_segment = max(2, int(samples_per_segment))
+    segments = []
+    for start, end in zip(points[:-1], points[1:]):
+        t_values = np.linspace(0.0, 1.0, samples_per_segment, endpoint=False)
+        segment = start + (end - start) * t_values[:, None]
+        segments.append(segment)
+
+    sampled = np.vstack(segments + [points[-1][None, :].astype(np.float64)])
+    return sampled
+
+
+def build_epicycle_shape(shape_select: str) -> tuple[np.ndarray, int, str | None]:
+    """Return the point cloud, slider limit and an optional notice for the selected figure."""
+    N_pts = 80
+    notice = None
+
+    t_vals = np.linspace(0, 2 * np.pi, N_pts, endpoint=False)
+
+    if shape_select == "Círculo":
+        pts = 100 * np.exp(1j * t_vals)
+        max_vecs = len(pts)
+    elif shape_select == "Corazón":
+        x = 16 * np.sin(t_vals) ** 3
+        y = 13 * np.cos(t_vals) - 5 * np.cos(2 * t_vals) - 2 * np.cos(3 * t_vals) - np.cos(4 * t_vals)
+        pts = 6 * (x + 1j * y)
+        max_vecs = len(pts)
+    elif shape_select == "Estrella":
+        r = np.where(np.arange(10) % 2 == 0, 100, 40)
+        ang = np.linspace(0, 2 * np.pi, 10, endpoint=False) - np.pi / 2
+        vx = np.append(r * np.cos(ang), (r * np.cos(ang))[0])
+        vy = np.append(r * np.sin(ang), (r * np.sin(ang))[0])
+        ts = np.linspace(0, 10, N_pts)
+        pts = np.interp(ts, np.arange(11), vx) + 1j * np.interp(ts, np.arange(11), vy)
+        max_vecs = len(pts)
+    elif shape_select == "Infinito":
+        x = 100 * np.cos(t_vals) / (1 + np.sin(t_vals) ** 2)
+        y = 100 * np.sin(t_vals) * np.cos(t_vals) / (1 + np.sin(t_vals) ** 2)
+        pts = x + 1j * y
+        max_vecs = len(pts)
+    elif shape_select == "Cuadrado":
+        verts = [100 + 100j, -100 + 100j, -100 - 100j, 100 - 100j, 100 + 100j]
+        vx = np.array([v.real for v in verts])
+        vy = np.array([v.imag for v in verts])
+        ts = np.linspace(0, 4, N_pts)
+        pts = np.interp(ts, np.arange(5), vx) + 1j * np.interp(ts, np.arange(5), vy)
+        max_vecs = len(pts)
+    else:
+        pts = 100 * np.exp(1j * t_vals)
+        max_vecs = len(pts)
+
+    return pts, max_vecs, notice
+
+
 # ─── Page configuration ───────────────────────────────────────────────────────
 st.set_page_config(
     page_title="Fourier Multimedia – Procesamiento Espectral",
@@ -726,37 +784,17 @@ with tab_epicycles:
 
     with col_ctrl:
         shape_select = st.selectbox("Figura:", ["Círculo", "Corazón", "Estrella", "Infinito", "Cuadrado"])
-        num_vecs     = st.slider("Vectores (frecuencias):", 1, 100, 30)
         show_circles = st.checkbox("Mostrar órbitas", True)
+        pts, max_vecs, shape_notice = build_epicycle_shape(shape_select)
 
-        N_pts  = 80
-        t_vals = np.linspace(0, 2 * np.pi, N_pts, endpoint=False)
+        if shape_notice:
+            st.info(shape_notice)
 
-        if shape_select == "Círculo":
-            pts = 100 * np.exp(1j * t_vals)
-        elif shape_select == "Corazón":
-            x   = 16 * np.sin(t_vals) ** 3
-            y   = 13 * np.cos(t_vals) - 5 * np.cos(2*t_vals) - 2 * np.cos(3*t_vals) - np.cos(4*t_vals)
-            pts = 6 * (x + 1j * y)
-        elif shape_select == "Estrella":
-            r   = np.where(np.arange(10) % 2 == 0, 100, 40)
-            ang = np.linspace(0, 2*np.pi, 10, endpoint=False) - np.pi / 2
-            vx  = np.append(r * np.cos(ang), (r * np.cos(ang))[0])
-            vy  = np.append(r * np.sin(ang), (r * np.sin(ang))[0])
-            ts  = np.linspace(0, 10, N_pts)
-            pts = np.interp(ts, np.arange(11), vx) + 1j * np.interp(ts, np.arange(11), vy)
-        elif shape_select == "Infinito":
-            x   = 100 * np.cos(t_vals) / (1 + np.sin(t_vals) ** 2)
-            y   = 100 * np.sin(t_vals) * np.cos(t_vals) / (1 + np.sin(t_vals) ** 2)
-            pts = x + 1j * y
-        else:  # Cuadrado
-            verts = [100+100j, -100+100j, -100-100j, 100-100j, 100+100j]
-            vx    = np.array([v.real for v in verts])
-            vy    = np.array([v.imag for v in verts])
-            ts    = np.linspace(0, 4, N_pts)
-            pts   = np.interp(ts, np.arange(5), vx) + 1j * np.interp(ts, np.arange(5), vy)
+        default_vecs = min(30, max_vecs)
+        num_vecs = st.slider("Vectores (frecuencias):", 1, max_vecs, default_vecs)
 
     with col_anim:
+        N_pts = len(pts)
         c       = np.fft.fft(pts)
         c_rot   = c.copy()
         centroid = c[0] / N_pts
